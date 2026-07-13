@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store';
+import { API_URL } from '../config';
 import * as LucideIcons from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -238,9 +239,9 @@ const Dashboard = () => {
   const fetchAllData = async () => {
     try {
       const [transRes, walletRes, catRes] = await Promise.all([
-        fetch(`http://localhost:5050/api/transactions?householdId=${householdId}&userId=${userId}`),
-        fetch(`http://localhost:5050/api/wallets?householdId=${householdId}&userId=${userId}`),
-        fetch(`http://localhost:5050/api/categories?householdId=${householdId}`)
+        fetch(`${API_URL}/api/transactions?householdId=${householdId}&userId=${userId}`),
+        fetch(`${API_URL}/api/wallets?householdId=${householdId}&userId=${userId}`),
+        fetch(`${API_URL}/api/categories?householdId=${householdId}`)
       ]);
       
       const transData = await transRes.json();
@@ -270,7 +271,7 @@ const Dashboard = () => {
 
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/transactions/${transactionId}`, {
+      const res = await fetch(`${API_URL}/api/transactions/${transactionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedData)
@@ -286,7 +287,7 @@ const Dashboard = () => {
 
   const handleDeleteTransaction = async (transactionId, adjustBalance) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/transactions/${transactionId}`, {
+      const res = await fetch(`${API_URL}/api/transactions/${transactionId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adjustBalance })

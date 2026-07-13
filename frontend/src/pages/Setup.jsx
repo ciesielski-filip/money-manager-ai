@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../store';
+import { API_URL } from '../config';
 import * as LucideIcons from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -172,7 +173,7 @@ const ChangeBudgetDialog = ({ isOpen, onClose }) => {
     setErrorMsg('');
     try {
       if (action === 'join') {
-        const res = await fetch('http://localhost:5050/api/household/join', {
+        const res = await fetch(`${API_URL}/api/household/join`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ inviteCode, userId })
@@ -185,7 +186,7 @@ const ChangeBudgetDialog = ({ isOpen, onClose }) => {
           setErrorMsg(data.error || 'Nie udało się dołączyć');
         }
       } else {
-        const res = await fetch('http://localhost:5050/api/household', {
+        const res = await fetch(`${API_URL}/api/household`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: householdName, userId })
@@ -294,9 +295,9 @@ const Setup = () => {
     const fetchData = async () => {
       try {
         const [catRes, walletRes, houseRes] = await Promise.all([
-          fetch(`http://localhost:5050/api/categories?householdId=${householdId}`),
-          fetch(`http://localhost:5050/api/wallets?householdId=${householdId}&userId=${userId}`),
-          fetch(`http://localhost:5050/api/household/${householdId}`)
+          fetch(`${API_URL}/api/categories?householdId=${householdId}`),
+          fetch(`${API_URL}/api/wallets?householdId=${householdId}&userId=${userId}`),
+          fetch(`${API_URL}/api/household/${householdId}`)
         ]);
         
         setCategories(await catRes.json());
@@ -311,7 +312,7 @@ const Setup = () => {
 
   const handleDeleteWallet = async (walletId, action, targetWalletId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/wallets/${walletId}`, {
+      const res = await fetch(`${API_URL}/api/wallets/${walletId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, targetWalletId })
@@ -319,7 +320,7 @@ const Setup = () => {
       if (res.ok) {
         setWallets(wallets.filter(w => w._id !== walletId));
         setWalletToDelete(null);
-        const walletRes = await fetch(`http://localhost:5050/api/wallets?householdId=${householdId}&userId=${userId}`);
+        const walletRes = await fetch(`${API_URL}/api/wallets?householdId=${householdId}&userId=${userId}`);
         setWallets(await walletRes.json());
       }
     } catch (err) {
@@ -329,7 +330,7 @@ const Setup = () => {
 
   const handleDeleteCategory = async (categoryId, action, targetCategoryId, adjustBalance) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/categories/${categoryId}`, {
+      const res = await fetch(`${API_URL}/api/categories/${categoryId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, targetCategoryId, adjustBalance })
@@ -338,7 +339,7 @@ const Setup = () => {
         setCategories(categories.filter(c => c._id !== categoryId));
         setCategoryToDelete(null);
         if (adjustBalance || action === 'move') {
-           const walletRes = await fetch(`http://localhost:5050/api/wallets?householdId=${householdId}&userId=${userId}`);
+           const walletRes = await fetch(`${API_URL}/api/wallets?householdId=${householdId}&userId=${userId}`);
            setWallets(await walletRes.json());
         }
       }
@@ -351,7 +352,7 @@ const Setup = () => {
     e.preventDefault();
     if (!newCatName) return;
     try {
-      const res = await fetch('http://localhost:5050/api/categories', {
+      const res = await fetch(`${API_URL}/api/categories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -374,7 +375,7 @@ const Setup = () => {
 
   const handleAddCategoryFromModal = async ({ name, type, color, icon }) => {
     try {
-      const res = await fetch('http://localhost:5050/api/categories', {
+      const res = await fetch(`${API_URL}/api/categories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -396,7 +397,7 @@ const Setup = () => {
 
   const handleAddWalletFromModal = async ({ name, balance, color, icon }) => {
     try {
-      const res = await fetch('http://localhost:5050/api/wallets', {
+      const res = await fetch(`${API_URL}/api/wallets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -421,7 +422,7 @@ const Setup = () => {
     e.preventDefault();
     if (!adjustingWallet || adjustBalance === '') return;
     try {
-      const res = await fetch(`http://localhost:5050/api/wallets/${adjustingWallet._id}/adjust`, {
+      const res = await fetch(`${API_URL}/api/wallets/${adjustingWallet._id}/adjust`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -443,7 +444,7 @@ const Setup = () => {
 
   const handleToggleShare = async (walletId) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/wallets/${walletId}/share`, {
+      const res = await fetch(`${API_URL}/api/wallets/${walletId}/share`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })

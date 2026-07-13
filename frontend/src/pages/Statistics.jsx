@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../store';
+import { API_URL } from '../config';
 import * as LucideIcons from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, RadialLinearScale, PointElement, LineElement, Title } from 'chart.js';
@@ -48,7 +49,7 @@ const Statistics = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch(`http://localhost:5050/api/transactions?householdId=${householdId}&userId=${userId}`);
+        const res = await fetch(`${API_URL}/api/transactions?householdId=${householdId}&userId=${userId}`);
         setTransactions(await res.json());
       } catch (err) {
         console.error(err);

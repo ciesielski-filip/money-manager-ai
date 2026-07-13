@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import useStore from '../store';
+import { API_URL } from '../config';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,7 @@ const LoginSetup = () => {
     const endpoint = isLoginMode ? '/api/user/login' : '/api/user/register';
     
     try {
-      const res = await fetch(`http://localhost:5050${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, password })
@@ -46,7 +47,7 @@ const LoginSetup = () => {
   const handleCreateHousehold = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:5050/api/household', {
+      const res = await fetch(`${API_URL}/api/household`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: householdName, userId })
@@ -63,7 +64,7 @@ const LoginSetup = () => {
   const handleJoinHousehold = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:5050/api/household/join', {
+      const res = await fetch(`${API_URL}/api/household/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteCode, userId })

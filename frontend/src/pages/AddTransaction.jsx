@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store';
+import { API_URL } from '../config';
 import * as LucideIcons from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -45,7 +46,7 @@ const AddTransaction = () => {
 
   const handleAddCategoryFromModal = async ({ name, type: catType, color, icon }) => {
     try {
-      const res = await fetch('http://localhost:5050/api/categories', {
+      const res = await fetch(`${API_URL}/api/categories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -73,7 +74,7 @@ const AddTransaction = () => {
 
   const handleAddWalletFromModal = async ({ name, balance, color, icon }) => {
     try {
-      const res = await fetch('http://localhost:5050/api/wallets', {
+      const res = await fetch(`${API_URL}/api/wallets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -99,8 +100,8 @@ const AddTransaction = () => {
     const fetchData = async () => {
       try {
         const [catRes, walletRes] = await Promise.all([
-          fetch(`http://localhost:5050/api/categories?householdId=${householdId}`),
-          fetch(`http://localhost:5050/api/wallets?householdId=${householdId}&userId=${userId}`)
+          fetch(`${API_URL}/api/categories?householdId=${householdId}`),
+          fetch(`${API_URL}/api/wallets?householdId=${householdId}&userId=${userId}`)
         ]);
         
         const catData = await catRes.json();
@@ -123,7 +124,7 @@ const AddTransaction = () => {
     
     setIsSubmitting(true);
     try {
-      const res = await fetch('http://localhost:5050/api/transactions', {
+      const res = await fetch(`${API_URL}/api/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
