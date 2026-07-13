@@ -31,12 +31,14 @@ const connectDB = async () => {
   
   const uri = process.env.MONGO_URI || (process.env.VERCEL ? null : 'mongodb://localhost:27017/money-manager');
   if (!uri) {
-    throw new Error('Brak zmiennej środowiskowej MONGO_URI w ustawieniach Vercel (Project Settings -> Environment Variables)!');
+    throw new Error('Brak zmiennej środowiskowej MONGO_URI w ustawieniach Vercel (Project Settings -> Environment Variables)! Pamiętaj, aby po dodaniu zmiennej kliknąć Redeploy w zakładce Deployments.');
   }
 
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     };
     cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
       return mongoose;
@@ -65,7 +67,7 @@ app.use(async (req, res, next) => {
     console.error('Database connection error in middleware:', error);
     if (!res.headersSent) {
       res.status(503).json({ 
-        error: 'Błąd połączenia z bazą danych na serwerze: ' + (error.message || 'Sprawdź MONGO_URI w Vercel Environment Variables i IP Whitelist 0.0.0.0/0 na MongoDB Atlas.') 
+        error: 'Błąd połączenia z bazą danych na serwerze: ' + (error.message || 'Sprawdź MONGO_URI w Vercel Environment Variables oraz czy IP Whitelist w MongoDB Atlas to 0.0.0.0/0.') 
       });
     }
   }
@@ -92,5 +94,13 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     });
   });
 }
+
+// Global Express Error Handler for Vercel Serverless
+app.use((err, req, res, next) => {
+  console.error('Global Express error caught:', err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Wewnętrzny błąd serwera Express: ' + (err.message || 'Nieznany błąd') });
+  }
+});
 
 module.exports = app;
