@@ -39,6 +39,15 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/wallets', walletRoutes);
 
+// Health Check Route for Browser Verification
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'Money Manager AI Backend is running successfully!' });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Local Server Execution (when not running inside Vercel serverless)
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   connectDB().then(() => {
