@@ -40,6 +40,9 @@ const connectDB = async () => {
     };
     cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
       return mongoose;
+    }).catch((err) => {
+      cached.promise = null;
+      throw err;
     });
   }
   try {
@@ -60,9 +63,11 @@ app.use(async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Database connection error in middleware:', error);
-    res.status(503).json({ 
-      error: 'Błąd połączenia z bazą danych na serwerze: ' + (error.message || 'Sprawdź MONGO_URI w Vercel Environment Variables.') 
-    });
+    if (!res.headersSent) {
+      res.status(503).json({ 
+        error: 'Błąd połączenia z bazą danych na serwerze: ' + (error.message || 'Sprawdź MONGO_URI w Vercel Environment Variables i IP Whitelist 0.0.0.0/0 na MongoDB Atlas.') 
+      });
+    }
   }
 });
 
