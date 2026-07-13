@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.5rem;
+    --brand: 142 70.6% 45.3%; /* emerald-500 */
+    --brand-foreground: 0 0% 98%;
+  }
+ 
+  .dark {
+    --background: 240 5% 8%;
+    --foreground: 0 0% 98%;
+    --card: 240 5% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 5% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 18%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 18%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 22%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 20%;
+    --input: 240 3.7% 20%;
+    --ring: 240 4.9% 83.9%;
+    --brand: 142 70.6% 45.3%; /* emerald-500 */
+    --brand-foreground: 0 0% 98%;
+  }
+
+  .theme-pink {
+    --background: 300 100% 99%;
+    --foreground: 300 50% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 300 50% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 300 50% 10%;
+    --primary: 310 70% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 300 20% 90%;
+    --secondary-foreground: 300 50% 10%;
+    --muted: 300 20% 92%;
+    --muted-foreground: 300 10% 45%;
+    --accent: 300 20% 90%;
+    --accent-foreground: 300 50% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 300 20% 90%;
+    --input: 300 20% 90%;
+    --ring: 310 70% 55%;
+    --brand: 310 70% 55%;
+    --brand-foreground: 0 0% 100%;
+  }
+
+  .dark.theme-pink {
+    --background: 280 30% 5%;
+    --foreground: 300 10% 90%;
+    --card: 280 25% 10%;
+    --card-foreground: 300 10% 90%;
+    --popover: 280 25% 10%;
+    --popover-foreground: 300 10% 90%;
+    --primary: 310 70% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 280 25% 15%;
+    --secondary-foreground: 300 10% 90%;
+    --muted: 280 25% 15%;
+    --muted-foreground: 300 10% 65%;
+    --accent: 280 25% 20%;
+    --accent-foreground: 300 10% 90%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 280 25% 20%;
+    --input: 280 25% 20%;
+    --ring: 310 70% 55%;
+    --brand: 310 70% 55%;
+    --brand-foreground: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mobile-first wrapper */
+#root {
+  max-width: 640px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: hsl(var(--background));
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  padding: 1.5rem;
+  padding-bottom: 5rem; /* space for bottom nav */
+}
