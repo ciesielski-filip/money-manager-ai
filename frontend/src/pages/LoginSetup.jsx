@@ -28,7 +28,8 @@ const LoginSetup = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, password })
       });
-      const data = await res.json();
+      
+      const data = await res.json().catch(() => ({ error: `Błąd serwera (HTTP ${res.status})` }));
       
       if (res.ok) {
         setUser(data._id, data.name);
@@ -36,11 +37,11 @@ const LoginSetup = () => {
           setHousehold(data.householdId, data.householdName);
         }
       } else {
-        setErrorMsg(data.error || 'Wystąpił błąd');
+        setErrorMsg(data.error || `Wystąpił błąd (HTTP ${res.status})`);
       }
     } catch (err) {
-      console.error(err);
-      setErrorMsg('Błąd połączenia z serwerem');
+      console.error('Auth fetch error:', err);
+      setErrorMsg(`Błąd połączenia z serwerem: ${err.message || 'sprawdź sieć lub CORS'}`);
     }
   };
 

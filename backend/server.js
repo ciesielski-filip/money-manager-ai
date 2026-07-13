@@ -8,6 +8,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({ origin: '*' }));
+app.options('*', cors({ origin: '*' }));
 app.use(express.json());
 
 // Health Check Routes (instant response without waiting for database)
@@ -27,11 +28,17 @@ if (!cached) {
 
 const connectDB = async () => {
   if (cached.conn) return cached.conn;
+  
+  const uri = process.env.MONGO_URI || (process.env.VERCEL ? null : 'mongodb://localhost:27017/money-manager');
+  if (!uri) {
+    throw new Error('Brak zmiennej środowiskowej MONGO_URI w ustawieniach Vercel (Project Settings -> Environment Variables)!');
+  }
+
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
     };
-    cached.promise = mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/money-manager', opts).then((mongoose) => {
+    cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
       return mongoose;
     });
   }
@@ -45,8 +52,18 @@ const connectDB = async () => {
 };
 
 app.use(async (req, res, next) => {
-  await connectDB();
-  next();
+  if (req.method === 'OPTIONS' || req.path === '/' || req.path === '/api/health') {
+    return next();
+  }
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('Database connection error in middleware:', error);
+    res.status(503).json({ 
+      error: 'Błąd połączenia z bazą danych na serwerze: ' + (error.message || 'Sprawdź MONGO_URI w Vercel Environment Variables.') 
+    });
+  }
 });
 
 // Routes
