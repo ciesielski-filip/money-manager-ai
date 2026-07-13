@@ -27,57 +27,45 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Optimized MongoDB Connection Helper for Serverless & Local
-let cached = global.mongoose;
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
-
+// Safe MongoDB Connection Helper for Serverless (Exact logic from commit 2e45bd2 + safe timeout)
 const connectDB = async () => {
-  if (cached.conn) return cached.conn;
+  if (mongoose.connection.readyState >= 1) {
+    return mongoose.connection;
+  }
   
   const uri = process.env.MONGO_URI || (process.env.VERCEL ? null : 'mongodb://localhost:27017/money-manager');
   if (!uri) {
-    throw new Error('Brak zmiennej środowiskowej MONGO_URI w ustawieniach Vercel (Project Settings -> Environment Variables)! Pamiętaj, aby po dodaniu zmiennej kliknąć Redeploy w zakładce Deployments.');
+    console.warn('Brak zmiennej MONGO_URI w Vercel Environment Variables');
+    return null;
   }
 
-  if (!cached.promise) {
-    const opts = {
+  try {
+    await mongoose.connect(uri, {
       bufferCommands: false,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-    };
-    cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
-      return mongoose;
-    }).catch((err) => {
-      cached.promise = null;
-      throw err;
     });
+    console.log('Connected to MongoDB successfully');
+    return mongoose.connection;
+  } catch (err) {
+    console.error('Failed to connect to MongoDB:', err.message);
+    return null;
   }
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    throw e;
-  }
-  return cached.conn;
 };
 
 app.use(async (req, res, next) => {
   if (req.method === 'OPTIONS' || req.path === '/' || req.path === '/api/health') {
     return next();
   }
-  try {
-    await connectDB();
-    next();
-  } catch (error) {
-    console.error('Database connection error in middleware:', error);
+  await connectDB();
+  if (mongoose.connection.readyState !== 1) {
     if (!res.headersSent) {
-      res.status(503).json({ 
-        error: 'Błąd połączenia z bazą danych na serwerze: ' + (error.message || 'Sprawdź MONGO_URI w Vercel Environment Variables oraz czy IP Whitelist w MongoDB Atlas to 0.0.0.0/0.') 
+      return res.status(503).json({ 
+        error: 'Błąd połączenia z bazą danych na serwerze: Sprawdź czy zmienna MONGO_URI w Vercel jest prawidłowa i czy MongoDB Atlas pozwala na dostęp z 0.0.0.0/0.' 
       });
     }
   }
+  next();
 });
 
 // Routes
