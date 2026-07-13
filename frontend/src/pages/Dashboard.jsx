@@ -317,11 +317,13 @@ const Dashboard = () => {
   // Data processing for layout
   const filteredTransactions = transactions.filter(t => {
     if (t.isAdjustment) return false;
-    if (t.categoryId?.type !== transactionType) return false;
+    const tType = t.type || t.categoryId?.type || (t.toWalletId ? 'transfer' : 'expense');
+    if (tType !== transactionType) return false;
     
     if (selectedWalletId !== 'all') {
       const walletId = t.walletId?._id || t.walletId;
-      if (walletId !== selectedWalletId) return false;
+      const targetWalletId = t.toWalletId?._id || t.toWalletId;
+      if (walletId !== selectedWalletId && targetWalletId !== selectedWalletId) return false;
     }
     
     // Time period filtering
@@ -350,16 +352,17 @@ const Dashboard = () => {
 
   const catMap = {};
   filteredTransactions.forEach(t => {
-    const name = t.categoryId?.name || 'Nieznane';
-    const catId = t.categoryId?._id || name;
+    const isTrans = t.type === 'transfer' || t.toWalletId;
+    const name = isTrans ? 'Przelewy między kontami' : (t.categoryId?.name || 'Nieznane');
+    const catId = isTrans ? 'transfers_virtual' : (t.categoryId?._id || name);
     if (!catMap[name]) {
       catMap[name] = { 
         _id: catId,
         name: name, 
-        rawCategory: t.categoryId || { _id: catId, name: name },
+        rawCategory: t.categoryId || { _id: catId, name: name, type: isTrans ? 'transfer' : 'expense' },
         value: 0, 
-        color: getCategoryColor(t.categoryId, colorTheme), 
-        icon: t.categoryId?.icon || 'Circle' 
+        color: isTrans ? '#3b82f6' : getCategoryColor(t.categoryId, colorTheme), 
+        icon: isTrans ? 'ArrowRightLeft' : (t.categoryId?.icon || 'Circle') 
       };
     }
     catMap[name].value += t.amount;
@@ -592,16 +595,18 @@ const Dashboard = () => {
                             <div className="flex items-center gap-3.5">
                               <div 
                                 className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm" 
-                                style={{ backgroundColor: selectedCategory.color || getCategoryColor(t.categoryId, colorTheme) }}
+                                style={{ backgroundColor: (t.type === 'transfer' || t.toWalletId) ? '#3b82f6' : (selectedCategory.color || getCategoryColor(t.categoryId, colorTheme)) }}
                               >
-                                <DynamicIcon name={t.categoryId?.icon || selectedCategory.icon || 'Circle'} size={20} />
+                                <DynamicIcon name={(t.type === 'transfer' || t.toWalletId) ? 'ArrowRightLeft' : (t.categoryId?.icon || selectedCategory.icon || 'Circle')} size={20} />
                               </div>
                               <div className="flex flex-col justify-center">
                                 <p className="font-semibold text-sm sm:text-base text-foreground leading-snug">
-                                  {t.categoryId?.name || selectedCategory.name}
+                                  {(t.type === 'transfer' || t.toWalletId) ? 'Przelew między kontami' : (t.categoryId?.name || selectedCategory.name)}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                  {t.walletId?.name || 'Portfel'}
+                                  {(t.type === 'transfer' || t.toWalletId) 
+                                    ? `Z: ${t.walletId?.name || 'Portfel'} ➔ Do: ${t.toWalletId?.name || 'Portfel'}`
+                                    : (t.walletId?.name || 'Portfel')}
                                 </p>
                                 {t.description && (
                                   <p className="text-xs text-muted-foreground/80 mt-0.5 font-light">
@@ -610,7 +615,7 @@ const Dashboard = () => {
                                 )}
                               </div>
                             </div>
-                            <div className={`font-semibold text-right whitespace-nowrap text-base sm:text-lg ${t.categoryId?.type === 'income' ? 'text-brand' : 'text-foreground'}`}>
+                            <div className={`font-semibold text-right whitespace-nowrap text-base sm:text-lg ${(t.type === 'transfer' || t.toWalletId) ? 'text-blue-500' : t.categoryId?.type === 'income' ? 'text-brand' : 'text-foreground'}`}>
                               {formatAmountPl(t.amount)} zł
                             </div>
                           </CardContent>
@@ -653,15 +658,13 @@ const Dashboard = () => {
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mt-0.5 text-foreground">
               {formatAmountPl(currentBalance)} zł
             </h2>
-          </div>
-
-          {/* Tabs: Wydatki / Dochody (Sliding Pill) */}
-          <div className="flex w-full mt-3 sm:mt-4 mb-2 bg-muted/60 p-1 rounded-xl relative">
+            {/* Tabs: WYDATKI / DOCHODY / PRZELEWY (Sliding Pill) */}
+          <div className="flex w-full max-w-xs mx-auto bg-muted/60 p-1 rounded-xl relative select-none my-2">
             <div 
               className="absolute top-1 bottom-1 left-1 bg-background shadow-sm rounded-lg transition-transform duration-300 ease-out border border-border/40"
               style={{
-                width: 'calc(50% - 0.25rem)',
-                transform: transactionType === 'expense' ? 'translateX(0)' : 'translateX(100%)'
+                width: 'calc(33.333% - 0.25rem)',
+                transform: transactionType === 'expense' ? 'translateX(0)' : transactionType === 'income' ? 'translateX(100%)' : 'translateX(200%)'
               }}
             ></div>
             <button
@@ -678,6 +681,14 @@ const Dashboard = () => {
             >
               DOCHODY
             </button>
+            <button
+              type="button"
+              onClick={() => setTransactionType('transfer')}
+              className={`relative z-10 flex-1 py-2 text-center text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors select-none ${transactionType === 'transfer' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}
+            >
+              PRZELEWY
+            </button>
+          </div>
           </div>
 
           {/* Dark Summary Card (Kliknij w okienko podsumowania, aby zwinąć/rozwinąć wykres) */}

@@ -5,6 +5,11 @@ const transactionSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  type: {
+    type: String,
+    enum: ['expense', 'income', 'transfer'],
+    default: 'expense'
+  },
   description: {
     type: String,
   },
@@ -15,7 +20,7 @@ const transactionSchema = new mongoose.Schema({
   categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
-    required: true,
+    required: false,
   },
   householdId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -31,6 +36,11 @@ const transactionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Wallet',
     required: true,
+  },
+  toWalletId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Wallet',
+    required: false,
   },
   isAdjustment: {
     type: Boolean,
