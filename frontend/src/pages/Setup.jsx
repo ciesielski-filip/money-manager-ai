@@ -265,7 +265,7 @@ const ChangeBudgetDialog = ({ isOpen, onClose }) => {
 };
 
 const Setup = () => {
-  const { householdId, householdName, userId, userName, logout, theme, setTheme, colorTheme, setColorTheme } = useStore();
+  const { householdId, householdName, userId, userName, profileImage, setProfileImage, logout, theme, setTheme, colorTheme, setColorTheme } = useStore();
   const [categories, setCategories] = useState([]);
   const customColors = Array.from(new Set(categories.map(c => c.color).filter(c => c && !PREDEFINED_COLORS.includes(c))));
   const [wallets, setWallets] = useState([]);
@@ -459,12 +459,54 @@ const Setup = () => {
   };
 
   return (
-    <div className="flex-1 p-6 pb-20">
+    <div className="flex-1 px-6 pb-20 pt-20">
       <h2 className="mb-6 font-semibold text-xl">Ustawienia</h2>
       
       <Card className="mb-6">
         <CardContent className="pt-6">
           <h3 className="text-lg font-semibold m-0">Grupa: {householdName}</h3>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <h3 className="text-lg font-semibold mb-4">Profil</h3>
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-muted-foreground">
+              {profileImage ? (
+                <img src={profileImage} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <LucideIcons.UserCircle size={38} />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-foreground">{userName || 'Użytkownik'}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Zdjęcie jest zapisane lokalnie w tej aplikacji.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-3 py-2 text-xs font-bold text-background hover:bg-foreground/90">
+                  <LucideIcons.ImagePlus size={15} />
+                  Dodaj profilowe
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => setProfileImage(String(reader.result || ''));
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+                {profileImage && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setProfileImage('')}>
+                    Usuń
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -497,24 +539,13 @@ const Setup = () => {
               </Select>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">Ukryj Statystyki</span>
-                <span className="text-xs text-muted-foreground">Wyłącza wykresy na pulpicie i ukrywa zakładkę</span>
-              </div>
-              <Checkbox 
-                checked={useStore.getState().hideStatistics} 
-                onCheckedChange={(checked) => useStore.getState().setHideStatistics(checked)} 
-                className="w-6 h-6 rounded-md"
-              />
-            </div>
           </div>
         </CardContent>
       </Card>
 
 
 
-      <Card className="mb-6 border border-border/50 shadow-sm rounded-3xl overflow-hidden">
+      <Card className="hidden">
         <CardContent className="p-5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
             <div>
@@ -595,7 +626,7 @@ const Setup = () => {
         </CardContent>
       </Card>
       
-      <Card className="border border-border/50 shadow-sm rounded-3xl overflow-hidden">
+      <Card className="hidden">
         <CardContent className="p-5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
             <div>

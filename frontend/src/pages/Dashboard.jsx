@@ -69,12 +69,14 @@ const DeleteTransactionDialog = ({ isOpen, onClose, transaction, onDelete }) => 
   );
 };
 
-const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCategories, onEdit }) => {
+const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCategories, householdId, userId, onEdit }) => {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [walletId, setWalletId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [date, setDate] = useState(new Date());
+  const [budgetPlanItems, setBudgetPlanItems] = useState([]);
+  const [plannedItemId, setPlannedItemId] = useState('');
 
   useEffect(() => {
     if (transaction) {
@@ -86,6 +88,33 @@ const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCa
     }
   }, [transaction]);
 
+  useEffect(() => {
+    const fetchBudgetPlan = async () => {
+      if (!isOpen || !transaction || !householdId || !userId || !date) {
+        setBudgetPlanItems([]);
+        setPlannedItemId('');
+        return;
+      }
+
+      try {
+        const month = format(date, 'yyyy-MM');
+        const res = await fetch(`${API_URL}/api/budgets/${month}?householdId=${householdId}&userId=${userId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Nie udało się pobrać planu');
+        const items = Array.isArray(data.plannedItems) ? data.plannedItems : [];
+        setBudgetPlanItems(items);
+        const linkedItem = items.find(item => (item.transactionIds || []).includes(transaction._id));
+        setPlannedItemId(linkedItem?.id || '');
+      } catch (err) {
+        console.error(err);
+        setBudgetPlanItems([]);
+        setPlannedItemId('');
+      }
+    };
+
+    fetchBudgetPlan();
+  }, [isOpen, transaction, householdId, userId, date]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!amount || !walletId || !categoryId || !date) return;
@@ -94,17 +123,25 @@ const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCa
       description,
       walletId,
       categoryId,
-      date: date.toISOString()
+      date: date.toISOString(),
+      plannedItemId: plannedItemId || null,
+      budgetMonth: format(date, 'yyyy-MM')
     });
   };
 
   if (!transaction) return null;
 
   const validCategories = allCategories.filter(c => !c.isAdjustment && c.name !== 'Korekta');
+  const selectedCategory = allCategories.find(category => category._id === categoryId);
+  const matchingPlanItems = budgetPlanItems.filter(item => (
+    item.type === selectedCategory?.type
+    && item.status !== 'cancelled'
+  ));
+  const getPlanItemCategoryName = (item) => allCategories.find(category => category._id === item.categoryId)?.name;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader className="flex flex-col items-center gap-2 mb-2">
           <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center mb-2">
             <LucideIcons.Edit2 size={32} />
@@ -113,7 +150,7 @@ const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCa
           <DialogDescription>Wprowadź nowe dane dla tej transakcji</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Kwota (zł)</label>
               <Input 
@@ -135,7 +172,7 @@ const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCa
                     <LucideIcons.CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 rounded-2xl overflow-hidden border-border/50" align="start">
+                <PopoverContent className="w-auto overflow-hidden rounded-2xl border-border/50 p-0 shadow-xl" align="start">
                   <Calendar
                     mode="single"
                     selected={date}
@@ -143,8 +180,8 @@ const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCa
                     disabled={(d) => d > new Date() || d < new Date("1900-01-01")}
                     initialFocus
                     captionLayout="dropdown"
-                    fromYear={2000}
-                    toYear={2050}
+                    startMonth={new Date(2000, 0)}
+                    endMonth={new Date(new Date().getFullYear() + 10, 11)}
                   />
                 </PopoverContent>
               </Popover>
@@ -161,7 +198,7 @@ const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCa
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Kategoria</label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
+            <Select value={categoryId} onValueChange={(nextCategoryId) => { setCategoryId(nextCategoryId); setPlannedItemId(''); }}>
               <SelectTrigger><SelectValue placeholder="Wybierz kategorię" /></SelectTrigger>
               <SelectContent>
                 {validCategories.map(c => (
@@ -180,6 +217,24 @@ const EditTransactionDialog = ({ isOpen, onClose, transaction, allWallets, allCa
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1 rounded-xl border border-border/70 bg-muted/25 p-3">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Powiązanie z budżetem</label>
+            {matchingPlanItems.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">Brak pasujących pozycji planu w miesiącu tej transakcji.</p>
+            ) : (
+              <Select value={plannedItemId || '__none__'} onValueChange={(value) => setPlannedItemId(value === '__none__' ? '' : value)}>
+                <SelectTrigger className="mt-2"><SelectValue placeholder="Nie powiązano" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nie powiązuj</SelectItem>
+                  {matchingPlanItems.map(item => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}{getPlanItemCategoryName(item) ? ` · ${getPlanItemCategoryName(item)}` : ''} · {item.actualAmount.toFixed(2)} / {item.plannedAmount.toFixed(2)} zł
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <DialogFooter className="flex gap-2 sm:justify-center w-full mt-4">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Anuluj</Button>
@@ -267,6 +322,7 @@ const Dashboard = () => {
     } catch (err) {
       console.error(err);
     }
+
   };
 
   const handleEditTransaction = async (transactionId, updatedData) => {
@@ -306,6 +362,13 @@ const Dashboard = () => {
       fetchAllData();
     }
   }, [householdId]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('dashboard-category-detail', { detail: Boolean(selectedCategory) }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('dashboard-category-detail', { detail: false }));
+    };
+  }, [selectedCategory]);
 
   const handleSummaryCardClick = (e) => {
     if (e.target.closest('button') || e.target.closest('[role="combobox"]') || e.target.closest('[role="dialog"]') || e.target.closest('.popover-trigger')) {
@@ -438,87 +501,25 @@ const Dashboard = () => {
       groupedByDate[dateStr].push(t);
     });
 
-    const handleDownloadCsv = () => {
-      if (!selectedCategoryTransactions.length) return;
-      const headers = ["Data", "Kategoria", "Portfel", "Opis", "Kwota"];
-      const rows = selectedCategoryTransactions.map(t => [
-        format(new Date(t.date), "yyyy-MM-dd"),
-        t.categoryId?.name || selectedCategory.name,
-        t.walletId?.name || '',
-        `"${(t.description || '').replace(/"/g, '""')}"`,
-        t.amount.toFixed(2)
-      ]);
-      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `transakcje_${selectedCategory.name}_${format(new Date(), "yyyy-MM-dd")}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    };
-
     return (
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
-        <div className="sticky top-0 z-20 bg-background pt-5 px-4 sm:px-6 pb-2 border-b border-border/40 shadow-sm flex-shrink-0">
-          <div className="flex items-center justify-between mb-2">
+        <div className="sticky top-0 z-20 bg-background px-4 pb-2 pt-4 sm:px-6 border-b border-border/40 shadow-sm flex-shrink-0">
+          <div className="relative mb-2 flex h-12 items-center justify-center">
             <button 
               type="button"
               onClick={() => setSelectedCategory(null)} 
-              className="p-2 -ml-2 rounded-full text-foreground hover:bg-muted/50 transition-colors"
+              className="absolute left-0 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-background/95 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted"
+              title="Wróć"
             >
               <LucideIcons.ChevronLeft size={26} />
             </button>
-            <div className="flex flex-col items-center">
-              <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                {selectedCategory.name}
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-foreground mt-0.5">
+            <div className="flex flex-col items-center justify-center text-center">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Suma:</span>
+              <span className="text-2xl sm:text-3xl font-bold text-foreground">
                 {formatAmountPl(catTotal)} zł
               </span>
             </div>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <button 
-                type="button"
-                onClick={() => setShowCategorySearch(!showCategorySearch)} 
-                className="p-2 rounded-full text-foreground hover:bg-muted/50 transition-colors"
-              >
-                <LucideIcons.Search size={22} />
-              </button>
-              <button 
-                type="button"
-                onClick={handleDownloadCsv} 
-                className="p-2 -mr-2 rounded-full text-foreground hover:bg-muted/50 transition-colors"
-                title="Pobierz CSV"
-              >
-                <LucideIcons.Download size={22} />
-              </button>
-            </div>
           </div>
-
-          {showCategorySearch && (
-            <div className="pt-2 pb-3 px-1 animate-in fade-in duration-200">
-              <div className="relative">
-                <LucideIcons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder={`Szukaj w ${selectedCategory.name}...`}
-                  value={categorySearchQuery}
-                  onChange={e => setCategorySearchQuery(e.target.value)}
-                  className="pl-9 pr-8 text-sm rounded-xl"
-                />
-                {categorySearchQuery && (
-                  <button 
-                    type="button"
-                    onClick={() => setCategorySearchQuery('')} 
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <LucideIcons.X size={16} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
           <div className="flex justify-between items-center py-2 border-t border-border/30 mt-3 text-sm">
             <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
@@ -594,7 +595,7 @@ const Dashboard = () => {
                           <CardContent className="p-3.5 px-4 flex justify-between items-center">
                             <div className="flex items-center gap-3.5">
                               <div 
-                                className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm" 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0 shadow-sm" 
                                 style={{ backgroundColor: (t.type === 'transfer' || t.toWalletId) ? '#3b82f6' : (selectedCategory.color || getCategoryColor(t.categoryId, colorTheme)) }}
                               >
                                 <DynamicIcon name={(t.type === 'transfer' || t.toWalletId) ? 'ArrowRightLeft' : (t.categoryId?.icon || selectedCategory.icon || 'Circle')} size={20} />
@@ -658,13 +659,13 @@ const Dashboard = () => {
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mt-0.5 text-foreground">
               {formatAmountPl(currentBalance)} zł
             </h2>
-            {/* Tabs: WYDATKI / DOCHODY / PRZELEWY (Sliding Pill) */}
+            {/* Tabs: WYDATKI / DOCHODY (Sliding Pill) */}
           <div className="flex w-full max-w-xs mx-auto bg-muted/60 p-1 rounded-xl relative select-none my-2">
             <div 
               className="absolute top-1 bottom-1 left-1 bg-background shadow-sm rounded-lg transition-transform duration-300 ease-out border border-border/40"
               style={{
-                width: 'calc(33.333% - 0.25rem)',
-                transform: transactionType === 'expense' ? 'translateX(0)' : transactionType === 'income' ? 'translateX(100%)' : 'translateX(200%)'
+                width: 'calc(50% - 0.25rem)',
+                transform: transactionType === 'expense' ? 'translateX(0)' : 'translateX(100%)'
               }}
             ></div>
             <button
@@ -680,13 +681,6 @@ const Dashboard = () => {
               className={`relative z-10 flex-1 py-2 text-center text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors select-none ${transactionType === 'income' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}
             >
               DOCHODY
-            </button>
-            <button
-              type="button"
-              onClick={() => setTransactionType('transfer')}
-              className={`relative z-10 flex-1 py-2 text-center text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors select-none ${transactionType === 'transfer' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}
-            >
-              PRZELEWY
             </button>
           </div>
           </div>
@@ -853,6 +847,7 @@ const Dashboard = () => {
               </div>
             )}
           </div>
+
         </div>
 
         {/* Scrollable Kategorie List */}
@@ -860,29 +855,29 @@ const Dashboard = () => {
           ref={scrollContainerRef} 
           className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 pb-28"
         >
-          <div className="flex flex-col gap-2.5 mb-6">
+          <div className="flex flex-col gap-2 mb-6">
             {catArray.map(c => {
               const pct = totalFiltered > 0 ? ((c.value / totalFiltered) * 100).toFixed(0) : 0;
               return (
                 <Card 
                   key={c.name} 
-                  className="bg-card border-border/50 hover:border-border transition-all duration-200 cursor-pointer shadow-sm rounded-2xl active:scale-[0.99]"
+                  className="bg-card border-border/50 hover:border-border transition-all duration-200 cursor-pointer shadow-sm rounded-lg active:scale-[0.99]"
                   onClick={() => {
                     setSelectedCategory(c);
                     setCategorySearchQuery('');
                     setShowCategorySearch(false);
                   }}
                 >
-                  <CardContent className="p-3.5 px-4 flex justify-between items-center">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-11 h-11 rounded-full flex items-center justify-center text-white shadow-sm shrink-0" style={{ backgroundColor: c.color }}>
-                        <DynamicIcon name={c.icon} size={22} />
+                  <CardContent className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm shrink-0" style={{ backgroundColor: c.color }}>
+                        <DynamicIcon name={c.icon} size={18} />
                       </div>
-                      <span className="font-semibold text-foreground text-base">{c.name}</span>
+                      <span className="truncate font-semibold text-foreground text-sm">{c.name}</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs sm:text-sm text-muted-foreground font-medium w-8 text-right">{pct}%</span>
-                      <span className="font-bold text-foreground text-right min-w-fit whitespace-nowrap text-base sm:text-lg">
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="text-xs text-muted-foreground font-medium w-7 text-right">{pct}%</span>
+                      <span className="font-bold text-foreground text-right min-w-fit whitespace-nowrap text-sm">
                         {formatAmountPl(c.value)} zł
                       </span>
                     </div>
@@ -913,8 +908,11 @@ const Dashboard = () => {
         transaction={transactionToEdit}
         allWallets={wallets}
         allCategories={categories}
+        householdId={householdId}
+        userId={userId}
         onEdit={handleEditTransaction}
       />
+
     </div>
   );
 };

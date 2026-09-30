@@ -51,6 +51,29 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Edit wallet metadata
+router.put('/:id', async (req, res) => {
+  try {
+    const { userId, name, color, icon } = req.body;
+    if (!userId) return res.status(400).json({ error: 'User ID is required' });
+
+    const wallet = await Wallet.findById(req.params.id);
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
+    if (wallet.ownerId.toString() !== userId) {
+      return res.status(403).json({ error: 'Only owner can edit this wallet' });
+    }
+
+    if (name !== undefined) wallet.name = name;
+    if (color !== undefined) wallet.color = color;
+    if (icon !== undefined) wallet.icon = icon;
+
+    await wallet.save();
+    res.status(200).json(wallet);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to edit wallet' });
+  }
+});
+
 // Toggle wallet sharing
 router.put('/:id/share', async (req, res) => {
   try {

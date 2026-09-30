@@ -8,9 +8,11 @@ const useStore = create(
       userId: null,
       householdName: '',
       userName: '',
+      profileImage: '',
       theme: 'dark', // 'light' or 'dark'
       colorTheme: 'default', // 'default', 'pink', etc.
       hideStatistics: false,
+      setProfileImage: (profileImage) => set({ profileImage }),
       setTheme: (theme) => set({ theme }),
       setColorTheme: (colorTheme) => set({ colorTheme }),
       setHideStatistics: (hideStatistics) => set({ hideStatistics }),

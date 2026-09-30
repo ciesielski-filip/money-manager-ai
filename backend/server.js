@@ -15,7 +15,6 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({ origin: '*' }));
-app.options('*', cors({ origin: '*' }));
 app.use(express.json());
 
 // Health Check Routes (instant response without waiting for database)
@@ -74,12 +73,18 @@ const userRoutes = require('./routes/userRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const walletRoutes = require('./routes/walletRoutes');
+const goalRoutes = require('./routes/goalRoutes');
+const goldRoutes = require('./routes/goldRoutes');
+const budgetRoutes = require('./routes/budgetRoutes');
 
 app.use('/api/household', householdRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/wallets', walletRoutes);
+app.use('/api/goals', goalRoutes);
+app.use('/api/gold', goldRoutes);
+app.use('/api/budgets', budgetRoutes);
 
 // Local Server Execution (when not running inside Vercel serverless)
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
