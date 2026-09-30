@@ -22,6 +22,11 @@ const categorySchema = new mongoose.Schema({
   icon: {
     type: String,
     default: 'circle'
+  },
+  costType: {
+    type: String,
+    enum: ['fixed', 'variable'],
+    default: 'variable'
   }
 });
 

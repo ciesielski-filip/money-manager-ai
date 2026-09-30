@@ -3,11 +3,64 @@ const router = express.Router();
 const Transaction = require('../models/Transaction');
 const Wallet = require('../models/Wallet');
 const Category = require('../models/Category');
+const MonthlyBudget = require('../models/MonthlyBudget');
 
 // Add a transaction
+const monthFromDate = (date) => {
+  const parsed = date ? new Date(date) : new Date();
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const linkTransactionToPlannedItem = async ({ householdId, budgetMonth, plannedItemId, transaction }) => {
+  if (!budgetMonth || !plannedItemId || !transaction) return;
+
+  const budget = await MonthlyBudget.findOne({ householdId, month: budgetMonth });
+  if (!budget) return;
+
+  const item = budget.plannedItems.id(plannedItemId);
+  if (!item) return;
+  if (item.type !== transaction.type) return;
+
+  const alreadyLinked = budget.plannedItems.some(plannedItem => (
+    plannedItem._id.toString() !== item._id.toString()
+    && (plannedItem.transactionIds || []).some(id => id.toString() === transaction._id.toString())
+  ));
+  if (alreadyLinked) return;
+
+  if (!(item.transactionIds || []).some(id => id.toString() === transaction._id.toString())) {
+    item.transactionIds.push(transaction._id);
+  }
+  item.status = 'completed';
+  await budget.save();
+};
+
+const unlinkTransactionFromPlannedItems = async ({ householdId, transactionId }) => {
+  if (!householdId || !transactionId) return;
+
+  const budgets = await MonthlyBudget.find({
+    householdId,
+    'plannedItems.transactionIds': transactionId,
+  });
+
+  for (const budget of budgets) {
+    let changed = false;
+    budget.plannedItems.forEach(item => {
+      const before = item.transactionIds.length;
+      item.transactionIds = item.transactionIds.filter(id => id.toString() !== transactionId.toString());
+      if (item.transactionIds.length !== before) {
+        changed = true;
+        if (item.transactionIds.length === 0 && item.status === 'completed') {
+          item.status = 'planned';
+        }
+      }
+    });
+    if (changed) await budget.save();
+  }
+};
+
 router.post('/', async (req, res) => {
   try {
-    const { amount, description, date, categoryId, householdId, userId, walletId, toWalletId, type } = req.body;
+    const { amount, description, date, categoryId, householdId, userId, walletId, toWalletId, type, plannedItemId, budgetMonth } = req.body;
     
     if (!walletId) {
       return res.status(400).json({ error: 'Wallet ID is required' });
@@ -66,6 +119,12 @@ router.post('/', async (req, res) => {
     });
     
     await newTransaction.save();
+    await linkTransactionToPlannedItem({
+      householdId,
+      budgetMonth: budgetMonth || monthFromDate(newTransaction.date),
+      plannedItemId,
+      transaction: newTransaction,
+    });
 
     // Update wallet balance
     const wallet = await Wallet.findById(walletId);
@@ -110,14 +169,18 @@ router.get('/', async (req, res) => {
       .populate('userId', 'name')
       .populate('walletId', 'name ownerId isShared color icon')
       .populate('toWalletId', 'name ownerId isShared color icon')
+      .populate('goalId', 'name color icon')
       .sort({ date: -1 });
       
     // Filter out private transactions of other users
     transactions = transactions.filter(t => {
       if (!t.walletId) return false;
       const ownerId = t.walletId.ownerId?._id ? t.walletId.ownerId._id.toString() : (t.walletId.ownerId?.toString() || '');
+      const targetOwnerId = t.toWalletId?.ownerId?._id
+        ? t.toWalletId.ownerId._id.toString()
+        : (t.toWalletId?.ownerId?.toString() || '');
       const isShared = t.walletId.isShared || (t.toWalletId && t.toWalletId.isShared);
-      return ownerId === userId || isShared;
+      return ownerId === userId || targetOwnerId === userId || isShared;
     });
 
     res.status(200).json(transactions);
@@ -130,7 +193,7 @@ router.get('/', async (req, res) => {
 // Edit a transaction
 router.put('/:id', async (req, res) => {
   try {
-    const { amount, description, date, categoryId, walletId, toWalletId, type } = req.body;
+    const { amount, description, date, categoryId, walletId, toWalletId, type, plannedItemId, budgetMonth } = req.body;
     const transactionId = req.params.id;
 
     const transaction = await Transaction.findById(transactionId);
@@ -202,6 +265,17 @@ router.put('/:id', async (req, res) => {
     transaction.walletId = walletId;
 
     await transaction.save();
+    if (plannedItemId !== undefined) {
+      await unlinkTransactionFromPlannedItems({ householdId: transaction.householdId, transactionId: transaction._id });
+      if (plannedItemId) {
+        await linkTransactionToPlannedItem({
+          householdId: transaction.householdId,
+          budgetMonth: budgetMonth || monthFromDate(transaction.date),
+          plannedItemId,
+          transaction,
+        });
+      }
+    }
     res.status(200).json(transaction);
   } catch (error) {
     console.error('Edit transaction error:', error);
@@ -217,6 +291,7 @@ router.delete('/:id', async (req, res) => {
 
     const transaction = await Transaction.findById(transactionId);
     if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+    await unlinkTransactionFromPlannedItems({ householdId: transaction.householdId, transactionId: transaction._id });
 
     if (adjustBalance) {
       if (transaction.type === 'transfer' || transaction.toWalletId) {

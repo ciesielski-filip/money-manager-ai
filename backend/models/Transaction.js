@@ -7,7 +7,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['expense', 'income', 'transfer'],
+    enum: ['expense', 'income', 'transfer', 'goal_deposit', 'goal_withdraw'],
     default: 'expense'
   },
   description: {
@@ -35,11 +35,16 @@ const transactionSchema = new mongoose.Schema({
   walletId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Wallet',
-    required: true,
+    required: false,
   },
   toWalletId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Wallet',
+    required: false,
+  },
+  goalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Goal',
     required: false,
   },
   isAdjustment: {

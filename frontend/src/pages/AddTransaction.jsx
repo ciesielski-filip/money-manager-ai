@@ -33,6 +33,7 @@ const AddTransaction = () => {
   const { householdId, userId } = useStore();
   const [categories, setCategories] = useState([]);
   const [wallets, setWallets] = useState([]);
+  const [budgetPlanItems, setBudgetPlanItems] = useState([]);
   
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -41,6 +42,7 @@ const AddTransaction = () => {
   const [toWalletId, setToWalletId] = useState('');
   const [type, setType] = useState('expense');
   const [date, setDate] = useState(new Date());
+  const [plannedItemId, setPlannedItemId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showAddWalletModal, setShowAddWalletModal] = useState(false);
@@ -126,6 +128,30 @@ const AddTransaction = () => {
     if (householdId) fetchData();
   }, [householdId, userId]);
 
+  useEffect(() => {
+    const fetchBudgetPlan = async () => {
+      if (!householdId || !userId || type === 'transfer' || !date) {
+        setBudgetPlanItems([]);
+        setPlannedItemId('');
+        return;
+      }
+
+      try {
+        const month = format(date, 'yyyy-MM');
+        const res = await fetch(`${API_URL}/api/budgets/${month}?householdId=${householdId}&userId=${userId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Nie udało się pobrać planu');
+        setBudgetPlanItems(Array.isArray(data.plannedItems) ? data.plannedItems : []);
+      } catch (err) {
+        console.error(err);
+        setBudgetPlanItems([]);
+        setPlannedItemId('');
+      }
+    };
+
+    fetchBudgetPlan();
+  }, [householdId, userId, type, date]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!amount || !walletId || !date || isSubmitting) return;
@@ -179,7 +205,9 @@ const AddTransaction = () => {
           walletId,
           householdId,
           userId,
-          date: date.toISOString()
+          date: date.toISOString(),
+          plannedItemId: plannedItemId || undefined,
+          budgetMonth: format(date, 'yyyy-MM')
         })
       });
       if (res.ok) {
@@ -194,6 +222,11 @@ const AddTransaction = () => {
   };
 
   const filteredCategories = categories.filter(c => c.type === type);
+  const matchingPlanItems = budgetPlanItems.filter(item => (
+    item.type === type
+    && item.status !== 'cancelled'
+  ));
+  const getPlanItemCategoryName = (item) => categories.find(category => category._id === item.categoryId)?.name;
 
   useEffect(() => {
     if (categoryId) {
@@ -201,6 +234,12 @@ const AddTransaction = () => {
       if (!catExists) setCategoryId('');
     }
   }, [type, categories]);
+
+  useEffect(() => {
+    if (plannedItemId && !matchingPlanItems.some(item => item.id === plannedItemId)) {
+      setPlannedItemId('');
+    }
+  }, [plannedItemId, matchingPlanItems]);
 
   if (wallets.length === 0) {
     return (
@@ -226,7 +265,7 @@ const AddTransaction = () => {
   return (
     <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background pb-28">
       {/* Top Header */}
-      <div className="sticky top-0 z-20 bg-background pt-5 px-4 sm:px-6 pb-3 border-b border-border/40 shadow-sm flex items-center justify-between">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/40 bg-background px-4 pb-3 pt-16 shadow-sm sm:px-6">
         <button 
           type="button" 
           onClick={() => navigate('/')} 
@@ -413,7 +452,7 @@ const AddTransaction = () => {
         ) : (
           <>
             {/* Date & Wallet Selection Controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-3">
               {/* Wallet Select */}
               <div className="bg-card border border-border/50 rounded-2xl p-3 px-3.5 shadow-sm flex flex-col justify-center">
                 <div className="flex items-center justify-between mb-1">
@@ -429,25 +468,7 @@ const AddTransaction = () => {
                 <Select value={walletId} onValueChange={setWalletId} required>
                   <SelectTrigger className="border-none shadow-none p-0 h-auto bg-transparent focus:ring-0 text-foreground font-bold text-sm sm:text-base flex items-center justify-between">
                     <div className="flex items-center gap-2 overflow-hidden">
-                      {(() => {
-                        const selectedW = wallets.find(w => w._id === walletId);
-                        if (selectedW) {
-                          return (
-                            <>
-                              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white shrink-0 shadow-sm" style={{ backgroundColor: selectedW.color || '#3b82f6' }}>
-                                <DynamicIcon name={selectedW.icon || 'CreditCard'} size={14} />
-                              </div>
-                              <SelectValue placeholder="Wybierz portfel" />
-                            </>
-                          );
-                        }
-                        return (
-                          <>
-                            <LucideIcons.Wallet className="w-4 h-4 text-foreground shrink-0" />
-                            <SelectValue placeholder="Wybierz portfel" />
-                          </>
-                        );
-                      })()}
+                      <SelectValue placeholder="Wybierz portfel" />
                     </div>
                   </SelectTrigger>
                   <SelectContent>
@@ -540,6 +561,25 @@ const AddTransaction = () => {
                 </div>
               )}
             </div>
+
+            {matchingPlanItems.length > 0 && (
+              <div className="bg-card border border-border/50 rounded-2xl p-3 px-3.5 shadow-sm flex flex-col justify-center">
+                <span className="text-[11px] font-semibold uppercase text-muted-foreground tracking-wider mb-1">Powiąż z planem miesiąca</span>
+                <Select value={plannedItemId || '__none__'} onValueChange={(value) => setPlannedItemId(value === '__none__' ? '' : value)}>
+                  <SelectTrigger className="border-none shadow-none p-0 h-auto bg-transparent focus:ring-0 text-foreground font-bold text-sm sm:text-base">
+                    <SelectValue placeholder="Nie powiązuj" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nie powiązuj</SelectItem>
+                    {matchingPlanItems.map(item => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}{getPlanItemCategoryName(item) ? ` · ${getPlanItemCategoryName(item)}` : ''} · {item.actualAmount.toFixed(2)} / {item.plannedAmount.toFixed(2)} zł
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </>
         )}
 

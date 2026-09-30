@@ -8,14 +8,15 @@ const Wallet = require('../models/Wallet');
 // Add a category
 router.post('/', async (req, res) => {
   try {
-    const { name, type, householdId, color, icon } = req.body;
+    const { name, type, householdId, color, icon, costType } = req.body;
     
     const newCategory = new Category({
       name,
       type,
       householdId,
       color: color || '#cccccc',
-      icon: icon || 'circle'
+      icon: icon || 'circle',
+      costType: costType === 'fixed' ? 'fixed' : 'variable'
     });
     
     await newCategory.save();
@@ -38,6 +39,27 @@ router.get('/', async (req, res) => {
     res.status(200).json(categories);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Edit a category
+router.put('/:id', async (req, res) => {
+  try {
+    const { householdId, name, color, icon, costType } = req.body;
+    if (!householdId) return res.status(400).json({ error: 'Household ID is required' });
+
+    const category = await Category.findOne({ _id: req.params.id, householdId });
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+
+    if (name !== undefined) category.name = name;
+    if (color !== undefined) category.color = color;
+    if (icon !== undefined) category.icon = icon;
+    if (costType !== undefined) category.costType = costType === 'fixed' ? 'fixed' : 'variable';
+
+    await category.save();
+    res.status(200).json(category);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to edit category' });
   }
 });
 
