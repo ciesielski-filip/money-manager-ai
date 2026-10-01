@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import useStore from '../store';
 import { API_URL } from '../config';
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,14 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const LoginSetup = () => {
-  const [isJoin, setIsJoin] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   
   const [inviteCode, setInviteCode] = useState('');
-  const [householdName, setHouseholdName] = useState('');
   
   const { userId, householdId, setUser, setHousehold } = useStore();
 
@@ -26,7 +24,11 @@ const LoginSetup = () => {
       const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, password })
+        body: JSON.stringify({
+          name,
+          password,
+          ...(!isLoginMode && inviteCode ? { inviteCode } : {}),
+        })
       });
       
       const data = await res.json().catch(() => ({ error: `Błąd serwera (HTTP ${res.status})` }));
@@ -42,40 +44,6 @@ const LoginSetup = () => {
     } catch (err) {
       console.error('Auth fetch error:', err);
       setErrorMsg(`Błąd połączenia z serwerem: ${err.message || 'sprawdź sieć lub CORS'}`);
-    }
-  };
-
-  const handleCreateHousehold = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_URL}/api/household`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: householdName, userId })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setHousehold(data._id, data.name);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleJoinHousehold = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_URL}/api/household/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inviteCode, userId })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setHousehold(data._id, data.name);
-      }
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -125,6 +93,23 @@ const LoginSetup = () => {
                   required
                 />
               </div>
+              {!isLoginMode && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Kod budżetu domowego <span className="font-normal text-muted-foreground">(opcjonalnie)</span></label>
+                  <Input
+                    type="text"
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    maxLength={9}
+                    placeholder="Np. A1B2-C3D4"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8))}
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Wpisz kod otrzymany od domownika. Bez kodu utworzymy dla Ciebie nowy, prywatny budżet.
+                  </p>
+                </div>
+              )}
               {errorMsg && <p className="text-sm text-destructive text-center">{errorMsg}</p>}
               <Button type="submit" className="w-full mt-2">
                 {isLoginMode ? 'Zaloguj się' : 'Zarejestruj się'}

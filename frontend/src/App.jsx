@@ -175,7 +175,7 @@ function App() {
         )}
         <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-        <nav className="fixed bottom-0 w-full max-w-[640px] bg-background border-t border-border flex justify-around py-3 z-50 mx-auto">
+        <nav className="fixed bottom-0 w-full max-w-[640px] bg-background border-t border-border flex justify-around pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] z-50 mx-auto">
           <NavLink to="/" className={({ isActive }) => `flex h-11 w-11 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`} title="Dashboard">
             <Home size={23} />
           </NavLink>

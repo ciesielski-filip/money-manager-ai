@@ -23,6 +23,10 @@ const walletSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  isArchived: {
+    type: Boolean,
+    default: false,
+  },
   color: {
     type: String,
     default: '#3b82f6',

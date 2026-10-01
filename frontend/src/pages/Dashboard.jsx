@@ -503,7 +503,7 @@ const Dashboard = () => {
 
     return (
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
-        <div className="sticky top-0 z-20 bg-background px-4 pb-2 pt-4 sm:px-6 border-b border-border/40 shadow-sm flex-shrink-0">
+        <div className="sticky top-0 z-20 bg-background px-4 pb-2 pt-3 sm:px-6 border-b border-border/40 shadow-sm flex-shrink-0">
           <div className="relative mb-2 flex h-12 items-center justify-center">
             <button 
               type="button"
@@ -641,7 +641,7 @@ const Dashboard = () => {
     return (
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
         {/* Sticky Summary Header */}
-        <div className="sticky top-0 z-20 bg-background pt-5 px-4 sm:px-6 pb-3 border-b border-border/40 shadow-sm flex-shrink-0 transition-all duration-300">
+        <div className="sticky top-0 z-20 bg-background pt-4 px-4 sm:px-6 pb-3 border-b border-border/40 shadow-sm flex-shrink-0 transition-all duration-300">
           {/* HEADER: Wallet Selection & Balance (Bez hamburger menu i bez ikony po prawej) */}
           <div className="flex flex-col items-center justify-center">
             <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>

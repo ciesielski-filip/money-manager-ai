@@ -39,6 +39,7 @@ router.get('/', async (req, res) => {
     // Wallets are visible if they belong to the user OR are shared
     const wallets = await Wallet.find({ 
       householdId,
+      isArchived: { $ne: true },
       $or: [
         { ownerId: userId },
         { isShared: true }

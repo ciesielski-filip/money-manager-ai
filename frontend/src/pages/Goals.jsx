@@ -745,7 +745,7 @@ const Goals = () => {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background pb-28">
-      <div className="sticky top-0 z-20 border-b border-border/40 bg-background px-4 pb-4 pt-16 shadow-sm sm:px-6">
+      <div className="sticky top-0 z-20 border-b border-border/40 bg-background px-4 pb-4 pt-14 shadow-sm sm:px-6">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Skarbonki</p>

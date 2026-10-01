@@ -26,7 +26,7 @@ const DynamicIcon = ({ name, ...props }) => {
 };
 
 const Header = ({ title, subtitle }) => (
-  <div className="sticky top-0 z-20 border-b border-border/40 bg-background px-4 pb-4 pt-16 shadow-sm sm:px-6">
+  <div className="sticky top-0 z-20 border-b border-border/40 bg-background px-4 pb-4 pt-14 shadow-sm sm:px-6">
     <div>
       <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Zarządzanie</p>
       <h1 className="text-2xl font-black text-foreground">{title}</h1>
@@ -237,7 +237,7 @@ const ManageLists = ({ view }) => {
     <div className="flex-1 overflow-y-auto bg-background pb-28">
       <Header title={title} subtitle={subtitle} />
 
-      <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pt-8 sm:px-6">
+      <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pt-4 sm:px-6">
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             {error}

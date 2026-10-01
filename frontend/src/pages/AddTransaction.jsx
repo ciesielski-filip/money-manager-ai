@@ -265,7 +265,7 @@ const AddTransaction = () => {
   return (
     <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background pb-28">
       {/* Top Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/40 bg-background px-4 pb-3 pt-16 shadow-sm sm:px-6">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/40 bg-background px-4 pb-3 pt-14 shadow-sm sm:px-6">
         <button 
           type="button" 
           onClick={() => navigate('/')} 

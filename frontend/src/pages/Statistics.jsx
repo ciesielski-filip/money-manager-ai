@@ -129,7 +129,7 @@ const Statistics = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 pb-20 pt-20">
+    <div className="flex-1 overflow-y-auto px-6 pb-20 pt-16">
       <h2 className="mb-6 font-semibold text-xl">Statystyki i Analiza</h2>
 
       {/* Wykres Kołowy - Struktura Wydatków */}
