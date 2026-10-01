@@ -1,30 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import useStore from '../store';
 import { API_URL } from '../config';
 import * as LucideIcons from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AddCategoryModal from '../components/AddCategoryModal';
 import AddWalletModal from '../components/AddWalletModal';
 
-const PREDEFINED_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', 
-  '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e',
-  '#64748b', '#78716c', '#000000'
-];
-
-const PREDEFINED_ICONS = [
-  'ShoppingCart', 'Utensils', 'Car', 'Home', 'Smartphone', 'Zap', 'Coffee', 'HeartPulse',
-  'Plane', 'Gift', 'GraduationCap', 'Briefcase', 'DollarSign', 'CreditCard', 'PiggyBank',
-  'Monitor', 'Music', 'Smile'
-];
-
 const DynamicIcon = ({ name, ...props }) => {
   const IconComponent = LucideIcons[name] || LucideIcons.Circle;
   return <IconComponent {...props} />;
+};
+
+const formatInviteCode = (value = '') => {
+  const normalized = String(value).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  return normalized.length > 4 ? `${normalized.slice(0, 4)}-${normalized.slice(4, 8)}` : normalized;
 };
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -166,21 +159,24 @@ const ChangeBudgetDialog = ({ isOpen, onClose }) => {
   const [inviteCode, setInviteCode] = useState('');
   const [householdName, setHouseholdName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { userId, setHousehold } = useStore();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsSubmitting(true);
     try {
       if (action === 'join') {
         const res = await fetch(`${API_URL}/api/household/join`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ inviteCode, userId })
+          body: JSON.stringify({ inviteCode: inviteCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(), userId })
         });
         const data = await res.json();
         if (res.ok) {
           setHousehold(data._id, data.name);
+          setInviteCode('');
           onClose();
         } else {
           setErrorMsg(data.error || 'Nie udało się dołączyć');
@@ -194,13 +190,16 @@ const ChangeBudgetDialog = ({ isOpen, onClose }) => {
         const data = await res.json();
         if (res.ok) {
           setHousehold(data._id, data.name);
+          setHouseholdName('');
           onClose();
         } else {
-          setErrorMsg('Nie udało się utworzyć budżetu');
+          setErrorMsg(data.error || 'Nie udało się utworzyć budżetu');
         }
       }
-    } catch (err) {
+    } catch {
       setErrorMsg('Błąd połączenia z serwerem');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -235,11 +234,15 @@ const ChangeBudgetDialog = ({ isOpen, onClose }) => {
               <label className="block text-sm font-medium mb-2">Kod Zaproszenia</label>
               <Input 
                 type="text" 
-                placeholder="Wpisz 8-znakowy kod" 
+                inputMode="text"
+                autoCapitalize="characters"
+                maxLength={9}
+                placeholder="Np. A1B2-C3D4"
                 value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
+                onChange={(e) => setInviteCode(formatInviteCode(e.target.value))}
                 required
               />
+              <p className="mt-2 text-xs text-muted-foreground">Po dołączeniu zobaczysz wspólne kategorie oraz portfele udostępnione przez domowników.</p>
             </div>
           ) : (
             <div>
@@ -256,7 +259,9 @@ const ChangeBudgetDialog = ({ isOpen, onClose }) => {
           {errorMsg && <p className="text-sm text-destructive">{errorMsg}</p>}
           <DialogFooter className="mt-2">
             <Button type="button" variant="outline" onClick={onClose}>Anuluj</Button>
-            <Button type="submit">{action === 'join' ? 'Dołącz' : 'Utwórz'}</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Zapisywanie...' : action === 'join' ? 'Dołącz' : 'Utwórz'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -267,15 +272,12 @@ const ChangeBudgetDialog = ({ isOpen, onClose }) => {
 const Setup = () => {
   const { householdId, householdName, userId, userName, profileImage, setProfileImage, logout, theme, setTheme, colorTheme, setColorTheme } = useStore();
   const [categories, setCategories] = useState([]);
-  const customColors = Array.from(new Set(categories.map(c => c.color).filter(c => c && !PREDEFINED_COLORS.includes(c))));
   const [wallets, setWallets] = useState([]);
   const [householdData, setHouseholdData] = useState(null);
+  const [householdError, setHouseholdError] = useState('');
+  const [copiedInviteCode, setCopiedInviteCode] = useState(false);
+  const [isRotatingInviteCode, setIsRotatingInviteCode] = useState(false);
   
-  // Category Form
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatType, setNewCatType] = useState('expense');
-  const [newCatColor, setNewCatColor] = useState(PREDEFINED_COLORS[0]);
-  const [newCatIcon, setNewCatIcon] = useState(PREDEFINED_ICONS[0]);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
   // Wallet Form
@@ -293,22 +295,87 @@ const Setup = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      setHouseholdError('');
       try {
         const [catRes, walletRes, houseRes] = await Promise.all([
           fetch(`${API_URL}/api/categories?householdId=${householdId}`),
           fetch(`${API_URL}/api/wallets?householdId=${householdId}&userId=${userId}`),
-          fetch(`${API_URL}/api/household/${householdId}`)
+          fetch(`${API_URL}/api/household/${householdId}?userId=${userId}`)
         ]);
-        
-        setCategories(await catRes.json());
-        setWallets(await walletRes.json());
-        setHouseholdData(await houseRes.json());
+
+        const [categoryData, walletData, nextHouseholdData] = await Promise.all([
+          catRes.json(),
+          walletRes.json(),
+          houseRes.json(),
+        ]);
+        if (!catRes.ok || !walletRes.ok || !houseRes.ok) {
+          throw new Error(nextHouseholdData.error || categoryData.error || walletData.error || 'Nie udało się pobrać ustawień');
+        }
+
+        setCategories(Array.isArray(categoryData) ? categoryData : []);
+        setWallets(Array.isArray(walletData) ? walletData : []);
+        setHouseholdData(nextHouseholdData);
       } catch (err) {
         console.error(err);
+        setHouseholdError(err.message || 'Nie udało się pobrać budżetu domowego');
       }
     };
     if (householdId) fetchData();
   }, [householdId, userId]);
+
+  const handleCopyInviteCode = async () => {
+    const code = householdData?.inviteCode;
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedInviteCode(true);
+      window.setTimeout(() => setCopiedInviteCode(false), 2000);
+    } catch {
+      setHouseholdError('Nie udało się skopiować kodu. Przytrzymaj kod i skopiuj go ręcznie.');
+    }
+  };
+
+  const handleShareInviteCode = async () => {
+    const code = householdData?.inviteCode;
+    if (!code) return;
+    const shareText = `Dołącz do mojego budżetu „${householdData.name}” w Money Manager. Kod: ${formatInviteCode(code)}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Zaproszenie do budżetu domowego', text: shareText });
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopiedInviteCode(true);
+      window.setTimeout(() => setCopiedInviteCode(false), 2000);
+    } catch {
+      setHouseholdError('Nie udało się udostępnić zaproszenia.');
+    }
+  };
+
+  const handleRotateInviteCode = async () => {
+    if (!window.confirm('Wygenerować nowy kod? Poprzedni kod przestanie działać.')) return;
+    setIsRotatingInviteCode(true);
+    setHouseholdError('');
+    try {
+      const res = await fetch(`${API_URL}/api/household/${householdId}/invite-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Nie udało się wygenerować nowego kodu');
+      setHouseholdData(current => ({ ...current, inviteCode: data.inviteCode }));
+      setCopiedInviteCode(false);
+    } catch (err) {
+      setHouseholdError(err.message || 'Nie udało się wygenerować nowego kodu');
+    } finally {
+      setIsRotatingInviteCode(false);
+    }
+  };
 
   const handleDeleteWallet = async (walletId, action, targetWalletId) => {
     try {
@@ -342,31 +409,6 @@ const Setup = () => {
            const walletRes = await fetch(`${API_URL}/api/wallets?householdId=${householdId}&userId=${userId}`);
            setWallets(await walletRes.json());
         }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAddCategory = async (e) => {
-    e.preventDefault();
-    if (!newCatName) return;
-    try {
-      const res = await fetch(`${API_URL}/api/categories`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newCatName,
-          type: newCatType,
-          color: newCatColor,
-          icon: newCatIcon,
-          householdId
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCategories([...categories, data]);
-        setNewCatName('');
       }
     } catch (err) {
       console.error(err);
@@ -459,12 +501,97 @@ const Setup = () => {
   };
 
   return (
-    <div className="flex-1 px-6 pb-20 pt-20">
+    <div className="flex-1 px-6 pb-20 pt-16">
       <h2 className="mb-6 font-semibold text-xl">Ustawienia</h2>
       
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <h3 className="text-lg font-semibold m-0">Grupa: {householdName}</h3>
+      <Card className="mb-6 overflow-hidden">
+        <CardContent className="p-0">
+          <div className="border-b border-border/60 bg-muted/30 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Budżet domowy</p>
+                <h3 className="mt-1 truncate text-xl font-bold text-foreground">{householdData?.name || householdName || 'Twój budżet'}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {householdData?.members?.length || 1} {(householdData?.members?.length || 1) === 1 ? 'domownik' : 'domowników'}
+                </p>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-foreground text-background">
+                <LucideIcons.Users size={22} />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-5 p-5">
+            {householdError && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {householdError}
+              </div>
+            )}
+
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">Kod zaproszenia</p>
+                <button
+                  type="button"
+                  onClick={handleRotateInviteCode}
+                  disabled={isRotatingInviteCode || !householdData?.inviteCode}
+                  className="text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
+                >
+                  {isRotatingInviteCode ? 'Generowanie...' : 'Nowy kod'}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyInviteCode}
+                  disabled={!householdData?.inviteCode}
+                  className="flex min-w-0 flex-1 items-center justify-between rounded-2xl border border-border bg-background px-4 py-3 text-left shadow-sm disabled:opacity-50"
+                >
+                  <span className="font-mono text-xl font-black tracking-[0.18em] text-foreground">
+                    {householdData?.inviteCode ? formatInviteCode(householdData.inviteCode) : '••••-••••'}
+                  </span>
+                  {copiedInviteCode ? <LucideIcons.Check size={19} className="text-emerald-500" /> : <LucideIcons.Copy size={19} className="text-muted-foreground" />}
+                </button>
+                <Button type="button" size="icon" className="h-12 w-12 shrink-0 rounded-2xl" onClick={handleShareInviteCode} disabled={!householdData?.inviteCode} title="Udostępnij zaproszenie">
+                  <LucideIcons.Share2 size={19} />
+                </Button>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Wyślij ten kod drugiej osobie. Może wpisać go podczas tworzenia konta albo później w ustawieniach.
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-foreground">Domownicy</p>
+              <div className="space-y-2">
+                {(householdData?.members || []).map(member => {
+                  const isCreator = String(member._id) === String(householdData?.creatorId);
+                  const isCurrentUser = String(member._id) === String(userId);
+                  return (
+                    <div key={member._id} className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm">
+                        <LucideIcons.UserRound size={18} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-foreground">{member.name}{isCurrentUser ? ' (Ty)' : ''}</p>
+                        <p className="text-[11px] text-muted-foreground">{isCreator ? 'Założyciel budżetu' : 'Domownik'}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!householdData?.members?.length && (
+                  <p className="rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">Ładowanie listy domowników...</p>
+                )}
+              </div>
+            </div>
+
+            <Button type="button" variant="outline" onClick={() => setShowChangeBudget(true)} className="w-full">
+              Dołącz lub utwórz inny budżet
+            </Button>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Portfele są domyślnie prywatne. W sekcji kont możesz udostępnić wybrane portfele pozostałym domownikom.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -721,9 +848,6 @@ const Setup = () => {
       </Card>
 
       <div className="flex flex-col gap-3 mt-8">
-        <Button variant="secondary" onClick={() => setShowChangeBudget(true)} className="w-full text-base py-6">
-          Zmień grupę
-        </Button>
         <Button variant="destructive" onClick={logout} className="w-full text-base py-6 font-semibold shadow-sm">
           Wyloguj się
         </Button>
