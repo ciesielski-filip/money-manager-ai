@@ -5,9 +5,18 @@ import { API_URL } from '../config';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AddWalletModal from '../components/AddWalletModal';
 import AddCategoryModal from '../components/AddCategoryModal';
+import {
+  SwipeableList,
+  SwipeableListItem,
+  SwipeAction,
+  TrailingActions,
+  Type,
+} from 'react-swipeable-list';
+import 'react-swipeable-list/dist/styles.css';
 
 const money = (value) => new Intl.NumberFormat('pl-PL', {
   style: 'currency',
@@ -36,18 +45,11 @@ const Header = ({ title, subtitle }) => (
 );
 
 const EditItemDialog = ({ open, onClose, item, type, title, onSave }) => {
-  const [name, setName] = useState('');
-  const [balance, setBalance] = useState('');
+  const [name, setName] = useState(item?.name || '');
+  const [balance, setBalance] = useState(item?.balance !== undefined ? String(item.balance) : '');
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState('');
   const isWallet = type === 'wallet';
-
-  useEffect(() => {
-    setName(item?.name || '');
-    setBalance(item?.balance !== undefined ? String(item.balance) : '');
-    setLocalError('');
-    setSaving(false);
-  }, [item]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -106,6 +108,187 @@ const EditItemDialog = ({ open, onClose, item, type, title, onSave }) => {
   );
 };
 
+const DeleteWalletDialog = ({ open, onClose, wallet, wallets, transactionCount, onDelete }) => {
+  const targetWallets = wallets.filter(candidate => candidate._id !== wallet?._id);
+  const [action, setAction] = useState(targetWallets.length > 0 ? 'move' : 'delete');
+  const [targetWalletId, setTargetWalletId] = useState(targetWallets[0]?._id || '');
+  const [saving, setSaving] = useState(false);
+  const [localError, setLocalError] = useState('');
+
+  if (!wallet) return null;
+
+  const submit = async () => {
+    if (action === 'move' && !targetWalletId) {
+      setLocalError('Wybierz konto, na które mają trafić transakcje.');
+      return;
+    }
+    try {
+      setSaving(true);
+      setLocalError('');
+      await onDelete(wallet, { action, targetWalletId });
+    } catch (error) {
+      setLocalError(error.message || 'Nie udało się usunąć konta.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !saving && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+            <LucideIcons.Trash2 size={26} />
+          </div>
+          <DialogTitle>Usunąć konto „{wallet.name}”?</DialogTitle>
+          <DialogDescription>
+            Konto ma {transactionCount} {transactionCount === 1 ? 'powiązaną operację' : 'powiązanych operacji'}. Wybierz, co zrobić z historią.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {targetWallets.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setAction('move')}
+              className={`w-full rounded-2xl border p-4 text-left transition-colors ${action === 'move' ? 'border-foreground bg-muted/60' : 'border-border bg-background'}`}
+            >
+              <span className="flex items-center gap-3">
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${action === 'move' ? 'border-foreground' : 'border-muted-foreground'}`}>
+                  {action === 'move' && <span className="h-2.5 w-2.5 rounded-full bg-foreground" />}
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold text-foreground">Zachowaj transakcje</span>
+                  <span className="block text-xs text-muted-foreground">Przenieś historię i saldo na inne konto.</span>
+                </span>
+              </span>
+              {action === 'move' && (
+                <div className="mt-3 pl-8" onClick={event => event.stopPropagation()}>
+                  <Select value={targetWalletId} onValueChange={setTargetWalletId}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Wybierz konto docelowe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {targetWallets.map(candidate => (
+                        <SelectItem key={candidate._id} value={candidate._id}>{candidate.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setAction('delete')}
+            className={`flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-colors ${action === 'delete' ? 'border-destructive bg-destructive/10' : 'border-border bg-background'}`}
+          >
+            <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${action === 'delete' ? 'border-destructive' : 'border-muted-foreground'}`}>
+              {action === 'delete' && <span className="h-2.5 w-2.5 rounded-full bg-destructive" />}
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-foreground">Usuń konto i transakcje</span>
+              <span className="block text-xs text-muted-foreground">Historia powiązana z tym kontem zostanie trwale usunięta.</span>
+            </span>
+          </button>
+        </div>
+
+        {localError && <p className="text-sm text-destructive">{localError}</p>}
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Anuluj</Button>
+          <Button type="button" variant="destructive" onClick={submit} disabled={saving}>
+            {saving ? 'Usuwanie...' : 'Usuń konto'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const DeleteCategoryDialog = ({ open, onClose, category, categories, onDelete }) => {
+  const targetCategories = categories.filter(candidate => candidate._id !== category?._id && candidate.type === category?.type);
+  const [targetCategoryId, setTargetCategoryId] = useState(targetCategories[0]?._id || '');
+  const [saving, setSaving] = useState(false);
+  const [localError, setLocalError] = useState('');
+
+  if (!category) return null;
+
+  const submit = async () => {
+    if (targetCategories.length > 0 && !targetCategoryId) {
+      setLocalError('Wybierz kategorię docelową.');
+      return;
+    }
+    try {
+      setSaving(true);
+      setLocalError('');
+      await onDelete(category, {
+        action: targetCategories.length > 0 ? 'move' : 'delete',
+        targetCategoryId,
+      });
+    } catch (error) {
+      setLocalError(error.message || 'Nie udało się usunąć kategorii.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !saving && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+            <LucideIcons.Tags size={26} />
+          </div>
+          <DialogTitle>Usunąć kategorię „{category.name}”?</DialogTitle>
+          <DialogDescription>
+            Powiązane transakcje i pozycje planu budżetowego zostaną przeniesione do wybranej kategorii tego samego typu.
+          </DialogDescription>
+        </DialogHeader>
+
+        {targetCategories.length > 0 ? (
+          <div className="space-y-2 py-2">
+            <label className="text-xs font-medium text-muted-foreground">Przenieś do kategorii</label>
+            <Select value={targetCategoryId} onValueChange={setTargetCategoryId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Wybierz kategorię docelową" />
+              </SelectTrigger>
+              <SelectContent>
+                {targetCategories.map(candidate => (
+                  <SelectItem key={candidate._id} value={candidate._id}>{candidate.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-600 dark:text-amber-400">
+            Nie ma innej kategorii tego typu. Jeśli kategoria zawiera transakcje, najpierw utwórz kategorię docelową.
+          </div>
+        )}
+
+        {localError && <p className="text-sm text-destructive">{localError}</p>}
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Anuluj</Button>
+          <Button type="button" variant="destructive" onClick={submit} disabled={saving || targetCategories.length === 0}>
+            {saving ? 'Przenoszenie...' : 'Przenieś i usuń'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const DeleteSwipeAction = ({ onClick }) => (
+  <TrailingActions>
+    <SwipeAction onClick={onClick}>
+      <div className="flex h-full min-w-[92px] items-center justify-end pl-2">
+        <div className="flex h-full min-w-[84px] flex-col items-center justify-center gap-1 rounded-r-lg bg-destructive px-4 text-destructive-foreground">
+          <LucideIcons.Trash2 size={19} />
+          <span className="text-[11px] font-bold">Usuń</span>
+        </div>
+      </div>
+    </SwipeAction>
+  </TrailingActions>
+);
+
 const ManageLists = ({ view }) => {
   const { householdId, userId } = useStore();
   const [wallets, setWallets] = useState([]);
@@ -115,6 +298,8 @@ const ManageLists = ({ view }) => {
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [walletToDelete, setWalletToDelete] = useState(null);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [showTransfers, setShowTransfers] = useState(false);
   const [transactions, setTransactions] = useState([]);
 
@@ -147,7 +332,8 @@ const ManageLists = ({ view }) => {
   }, [householdId, userId]);
 
   useEffect(() => {
-    fetchData();
+    const frame = window.requestAnimationFrame(() => fetchData());
+    return () => window.cancelAnimationFrame(frame);
   }, [fetchData]);
 
   const visibleCategories = useMemo(
@@ -228,6 +414,43 @@ const ManageLists = ({ view }) => {
     await fetchData();
   };
 
+  const handleDeleteWallet = async (wallet, { action, targetWalletId }) => {
+    const res = await fetch(`${API_URL}/api/wallets/${wallet._id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, targetWalletId, householdId, userId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || 'Nie udało się usunąć konta.');
+    setWalletToDelete(null);
+    await fetchData();
+  };
+
+  const handleDeleteCategory = async (category, { action, targetCategoryId }) => {
+    const res = await fetch(`${API_URL}/api/categories/${category._id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        targetCategoryId,
+        adjustBalance: false,
+        householdId,
+        userId,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || 'Nie udało się usunąć kategorii.');
+    setCategoryToDelete(null);
+    await fetchData();
+  };
+
+  const walletTransactionCount = walletToDelete
+    ? transactions.filter(transaction => (
+      String(transaction.walletId?._id || transaction.walletId) === String(walletToDelete._id)
+      || String(transaction.toWalletId?._id || transaction.toWalletId) === String(walletToDelete._id)
+    )).length
+    : 0;
+
   const title = isAccounts ? 'Konta' : categoryType === 'expense' ? 'Kategorie wydatki' : 'Kategorie dochody';
   const subtitle = isAccounts
     ? `Suma: ${money(totalBalance)}`
@@ -272,9 +495,16 @@ const ManageLists = ({ view }) => {
         )}
 
         {!isAccounts && (
-          <Button type="button" size="sm" className="h-9 self-start rounded-lg px-3 text-xs" onClick={() => setCategoryModalOpen(true)}>
-            <LucideIcons.Plus size={15} /> Dodaj kategorię
-          </Button>
+          <div className="flex items-center justify-between gap-3">
+            <Button type="button" size="sm" className="h-9 rounded-lg px-3 text-xs" onClick={() => setCategoryModalOpen(true)}>
+              <LucideIcons.Plus size={15} /> Dodaj kategorię
+            </Button>
+            <span className="text-[11px] text-muted-foreground">Przesuń w lewo, aby usunąć</span>
+          </div>
+        )}
+
+        {isAccounts && !showTransfers && wallets.length > 0 && (
+          <p className="text-right text-[11px] text-muted-foreground">Przesuń konto w lewo, aby je usunąć</p>
         )}
 
         {loading ? (
@@ -297,47 +527,65 @@ const ManageLists = ({ view }) => {
             {transfers.length === 0 && <p className="rounded-lg border border-dashed border-border p-6 text-center text-muted-foreground">Brak przelewów.</p>}
           </div>
         ) : isAccounts ? (
-          <div className="space-y-2">
+          <div>
+            <SwipeableList type={Type.IOS} threshold={0.25}>
             {wallets.map(wallet => (
-              <Card key={wallet._id} className="rounded-lg border-border/70 bg-card shadow-sm">
-                <CardContent className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ backgroundColor: wallet.color || '#334155' }}>
-                      <DynamicIcon name={wallet.icon || 'Wallet'} size={18} />
+              <SwipeableListItem
+                key={wallet._id}
+                className="mb-2 rounded-lg"
+                trailingActions={String(wallet.ownerId?._id || wallet.ownerId) === String(userId)
+                  ? <DeleteSwipeAction onClick={() => setWalletToDelete(wallet)} />
+                  : undefined}
+              >
+                <Card className="w-full rounded-lg border-border/70 bg-card shadow-sm">
+                  <CardContent className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ backgroundColor: wallet.color || '#334155' }}>
+                        <DynamicIcon name={wallet.icon || 'Wallet'} size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{wallet.name}</p>
+                        {wallet.isShared && <p className="text-xs text-muted-foreground">Współdzielone</p>}
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">{wallet.name}</p>
-                      {wallet.isShared && <p className="text-xs text-muted-foreground">Współdzielone</p>}
+                    <div className="flex shrink-0 items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{money(wallet.balance)}</p>
+                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ type: 'wallet', item: wallet })}>
+                        <LucideIcons.Pencil size={15} />
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground">{money(wallet.balance)}</p>
-                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ type: 'wallet', item: wallet })}>
-                      <LucideIcons.Pencil size={15} />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </SwipeableListItem>
             ))}
+            </SwipeableList>
             {wallets.length === 0 && <p className="rounded-lg border border-dashed border-border p-6 text-center text-muted-foreground">Brak kont.</p>}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div>
+            <SwipeableList type={Type.IOS} threshold={0.25}>
             {visibleCategories.map(category => (
-              <Card key={category._id} className="rounded-lg border-border/70 bg-card shadow-sm">
-                <CardContent className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ backgroundColor: category.color || '#334155' }}>
-                      <DynamicIcon name={category.icon || 'Circle'} size={18} />
+              <SwipeableListItem
+                key={category._id}
+                className="mb-2 rounded-lg"
+                trailingActions={<DeleteSwipeAction onClick={() => setCategoryToDelete(category)} />}
+              >
+                <Card className="w-full rounded-lg border-border/70 bg-card shadow-sm">
+                  <CardContent className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ backgroundColor: category.color || '#334155' }}>
+                        <DynamicIcon name={category.icon || 'Circle'} size={18} />
+                      </div>
+                      <p className="truncate text-sm font-semibold text-foreground">{category.name}</p>
                     </div>
-                    <p className="truncate text-sm font-semibold text-foreground">{category.name}</p>
-                  </div>
-                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ type: 'category', item: category })}>
-                    <LucideIcons.Pencil size={15} />
-                  </Button>
-                </CardContent>
-              </Card>
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ type: 'category', item: category })}>
+                      <LucideIcons.Pencil size={15} />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </SwipeableListItem>
             ))}
+            </SwipeableList>
             {visibleCategories.length === 0 && <p className="rounded-lg border border-dashed border-border p-6 text-center text-muted-foreground">Brak kategorii.</p>}
           </div>
         )}
@@ -357,12 +605,30 @@ const ManageLists = ({ view }) => {
         categories={categories}
       />
       <EditItemDialog
+        key={editingItem?.item?._id || 'edit-item'}
         open={Boolean(editingItem)}
         onClose={() => setEditingItem(null)}
         item={editingItem?.item}
         type={editingItem?.type}
         title={editingItem?.type === 'wallet' ? 'Edytuj konto' : 'Edytuj kategorię'}
         onSave={editingItem?.type === 'wallet' ? handleEditWallet : handleEditCategory}
+      />
+      <DeleteWalletDialog
+        key={walletToDelete?._id || 'wallet-delete'}
+        open={Boolean(walletToDelete)}
+        onClose={() => setWalletToDelete(null)}
+        wallet={walletToDelete}
+        wallets={wallets}
+        transactionCount={walletTransactionCount}
+        onDelete={handleDeleteWallet}
+      />
+      <DeleteCategoryDialog
+        key={categoryToDelete?._id || 'category-delete'}
+        open={Boolean(categoryToDelete)}
+        onClose={() => setCategoryToDelete(null)}
+        category={categoryToDelete}
+        categories={categories}
+        onDelete={handleDeleteCategory}
       />
     </div>
   );

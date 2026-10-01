@@ -3,6 +3,7 @@ const router = express.Router();
 const Wallet = require('../models/Wallet');
 const Transaction = require('../models/Transaction');
 const Category = require('../models/Category');
+const MonthlyBudget = require('../models/MonthlyBudget');
 
 // Create a new wallet
 router.post('/', async (req, res) => {
@@ -152,38 +153,80 @@ router.put('/:id/adjust', async (req, res) => {
 // Delete a wallet
 router.delete('/:id', async (req, res) => {
   try {
-    const { action, targetWalletId } = req.body;
+    const { action, targetWalletId, userId, householdId } = req.body;
     const walletId = req.params.id;
 
-    if (action === 'move') {
-      if (!targetWalletId) return res.status(400).json({ error: 'Target wallet ID is required' });
-      
-      const transactions = await Transaction.find({ walletId });
-      
-      // We also need to update the target wallet's balance based on moved transactions
-      const targetWallet = await Wallet.findById(targetWalletId);
-      if (targetWallet) {
-        for (const t of transactions) {
-          const category = await Category.findById(t.categoryId);
-          if (category) {
-            if (category.type === 'income') {
-              targetWallet.balance += t.amount;
-            } else {
-              targetWallet.balance -= t.amount;
-            }
-          }
-        }
-        await targetWallet.save();
-      }
-
-      await Transaction.updateMany({ walletId }, { walletId: targetWalletId });
-    } else if (action === 'delete') {
-      // Just delete all associated transactions. The wallet is being deleted, so we don't care about reverting balances on it.
-      await Transaction.deleteMany({ walletId });
+    if (!userId || !householdId) {
+      return res.status(400).json({ error: 'User ID and household ID are required' });
+    }
+    if (!['move', 'delete'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid delete action' });
     }
 
-    await Wallet.findByIdAndDelete(walletId);
-    res.status(200).json({ message: 'Wallet deleted successfully' });
+    const wallet = await Wallet.findOne({ _id: walletId, householdId });
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
+    if (wallet.ownerId.toString() !== userId) {
+      return res.status(403).json({ error: 'Only owner can delete this wallet' });
+    }
+
+    let removedTransactionIds = [];
+    if (action === 'move') {
+      if (!targetWalletId) return res.status(400).json({ error: 'Target wallet ID is required' });
+      if (String(targetWalletId) === String(walletId)) {
+        return res.status(400).json({ error: 'Target wallet must be different' });
+      }
+
+      const targetWallet = await Wallet.findOne({
+        _id: targetWalletId,
+        householdId,
+        isArchived: { $ne: true },
+        $or: [{ ownerId: userId }, { isShared: true }],
+      });
+      if (!targetWallet) return res.status(404).json({ error: 'Target wallet not found or not accessible' });
+
+      const internalTransfers = await Transaction.find({
+        householdId,
+        type: 'transfer',
+        $or: [
+          { walletId: wallet._id, toWalletId: targetWallet._id },
+          { walletId: targetWallet._id, toWalletId: wallet._id },
+        ],
+      }).select('_id');
+      removedTransactionIds = internalTransfers.map(transaction => transaction._id);
+      if (removedTransactionIds.length > 0) {
+        await Transaction.deleteMany({ _id: { $in: removedTransactionIds } });
+      }
+
+      await Promise.all([
+        Transaction.updateMany({ householdId, walletId: wallet._id }, { walletId: targetWallet._id }),
+        Transaction.updateMany({ householdId, toWalletId: wallet._id }, { toWalletId: targetWallet._id }),
+      ]);
+
+      targetWallet.balance = Number(targetWallet.balance || 0) + Number(wallet.balance || 0);
+      await targetWallet.save();
+    } else if (action === 'delete') {
+      const transactions = await Transaction.find({
+        householdId,
+        $or: [{ walletId: wallet._id }, { toWalletId: wallet._id }],
+      }).select('_id');
+      removedTransactionIds = transactions.map(transaction => transaction._id);
+      if (removedTransactionIds.length > 0) {
+        await Transaction.deleteMany({ _id: { $in: removedTransactionIds } });
+      }
+    }
+
+    if (removedTransactionIds.length > 0) {
+      await MonthlyBudget.updateMany(
+        { householdId, 'plannedItems.transactionIds': { $in: removedTransactionIds } },
+        { $pull: { 'plannedItems.$[].transactionIds': { $in: removedTransactionIds } } }
+      );
+    }
+
+    await Wallet.deleteOne({ _id: wallet._id });
+    res.status(200).json({
+      message: 'Wallet deleted successfully',
+      removedTransactions: removedTransactionIds.length,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete wallet' });
   }
