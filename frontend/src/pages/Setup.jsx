@@ -382,7 +382,7 @@ const Setup = () => {
       const res = await fetch(`${API_URL}/api/wallets/${walletId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, targetWalletId })
+        body: JSON.stringify({ action, targetWalletId, userId, householdId })
       });
       if (res.ok) {
         setWallets(wallets.filter(w => w._id !== walletId));
@@ -400,7 +400,7 @@ const Setup = () => {
       const res = await fetch(`${API_URL}/api/categories/${categoryId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, targetCategoryId, adjustBalance })
+        body: JSON.stringify({ action, targetCategoryId, adjustBalance, userId, householdId })
       });
       if (res.ok) {
         setCategories(categories.filter(c => c._id !== categoryId));
